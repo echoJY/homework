@@ -9,6 +9,12 @@
 #include <iterator>
 #include <stdlib.h>
 #include <time.h>
+#include <string>
+#include <windows.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glaux.h>
+#include <GL/freeglut.h>
 using namespace std;
 
 #define PI 3.14159265358979
@@ -19,6 +25,7 @@ using namespace std;
 
 int numberOfPoints;
 double currentKnownBest, capacity;
+double maxX, minX, maxY, minY, coordinateX, coordinateY;
 
 int generation;					// Current generation number
 double dist[400][400];			// dist[i][j] saves the distance from i to j
@@ -29,7 +36,7 @@ double fitnessLowBound = LLONG_MAX;		// Record the fitness's value's lowbound
 /* Information of each node */
 struct node
 {
-	int x, y;					// Coordinate of the point
+	double x, y;				// Coordinate of the point
 	int No;						// No. of the point
 	double angleValue;			// Angle value of the point
 	double demand;				// Demand of the node
@@ -105,7 +112,7 @@ void sortPoints()
 void initializeServeSequence()
 {
 	double totalDemands = 0;
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		int k = 0;
 		for (int j = i + 1; j < cities.size(); j++)
@@ -142,12 +149,12 @@ void initializeServeSequence()
 /* Decide the points each vehicle serves */
 void decideServePoints()
 {
-	for (int j = 0; j < POPSIZE; j++)
+	for (int j = 0; j < numberOfPoints; j++)
 	{
 		vector<int> vehicle;
 		double totalDemands = 0;
 		population[j].vehicleServices.clear();
-		for (int i = 0; i < POPSIZE; i++)
+		for (int i = 0; i < numberOfPoints; i++)
 		{
 			if (totalDemands + cityByOrder[population[j].pointSequence[i]].demand < capacity)
 			{
@@ -171,7 +178,7 @@ void decideServePoints()
 /* Decide the route of each vehicle based on the points they serves */
 void decideVehicleRoute()
 {
-	for (int m = 0; m < POPSIZE; m++)
+	for (int m = 0; m < numberOfPoints; m++)
 	{
 		int k = 0;
 		for (int i = 0; i < population[m].vehicleServices.size(); i++)
@@ -217,7 +224,7 @@ void initialize()
 /* Compute each gene's fitness */
 void evaluate()
 {
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		double geneFitness = 0;
 		for (int j = 0; j < population[i].vehicleServices.size(); j++)
@@ -238,7 +245,7 @@ void evaluate()
 void keepTheBest()
 {
 	bool flag = true;
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		if (population[i].fitness < currentBest.fitness)
 		{
@@ -266,21 +273,21 @@ void select()
 {
 	double sum = 0, randomNum;
 	// Find total fitness of the population
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 		sum += 10000 / population[i].fitness;
 
 	// Calculate relative fitness
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 		population[i].rfitness = (10000 / population[i].fitness) / sum;
 
 	// Calculate cumulative fitness
 	population[0].cfitness = population[0].rfitness;
-	for (int i = 1; i < POPSIZE; i++)
+	for (int i = 1; i < numberOfPoints; i++)
 		population[i].cfitness = population[i - 1].cfitness + population[i].rfitness;
 
 	// Select survivors using cumulative fitness
 	srand(time(NULL));
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		randomNum = rand() % 1000 / 1000.0;
 		if (randomNum < population[0].cfitness)
@@ -289,7 +296,7 @@ void select()
 		}
 		else
 		{
-			for (int j = 0; j < POPSIZE; j++)
+			for (int j = 0; j < numberOfPoints; j++)
 			{
 				if (randomNum >= population[j].cfitness && randomNum < population[j + 1].cfitness)
 				{
@@ -301,7 +308,7 @@ void select()
 	}
 
 	// Copy the new population back to the old population
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 		population[i] = newPopulation[i];
 }
 
@@ -326,8 +333,8 @@ void Xover(int one, int two)
 	srand(time(NULL));
  	while (index1 == index2)
 	{
-		index1 = rand() % POPSIZE;
-		index2 = rand() % POPSIZE;
+		index1 = rand() % numberOfPoints;
+		index2 = rand() % numberOfPoints;
 	}
 	if (index1 > index2)
 	{
@@ -347,11 +354,11 @@ void Xover(int one, int two)
 
 	// Fill the left blanks in oneChild using population[two]
 	j = 0;
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		if (i == index1)
 		{
-			if (index2 + 1 == POPSIZE)
+			if (index2 + 1 == numberOfPoints)
 				break;
 			else
 				i = index2 + 1;
@@ -366,11 +373,11 @@ void Xover(int one, int two)
 
 	// Fill the left blanks in twoChild using population[one]
 	j = 0;
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		if (i == index1)
 		{
-			if (index2 + 1 == POPSIZE)
+			if (index2 + 1 == numberOfPoints)
 				break;
 			else
 				i = index2 + 1;
@@ -384,7 +391,7 @@ void Xover(int one, int two)
 	}
 
 	// Change population[one] and population[two] to oneChild and twoChild
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		population[one].pointSequence[i] = oneChild[i];
 		population[two].pointSequence[i] = twoChild[i];
@@ -395,18 +402,13 @@ void Xover(int one, int two)
 void crossover()
 {
 	int chosen = 0, one;				// Count the number of members chosen
-	for (int i = 0; i < POPSIZE / 2; i++)
+	for (int i = 0; i < numberOfPoints / 2; i++)
 	{
 		srand(time(NULL));
 		double x = rand() % 1000 / 1000.0;
 		if (x < PXOVER)
 		{
-			/*chosen++;
-			if (chosen % 2 == 0)
-				Xover(one, i);
-			else
-				one = i;*/
-			Xover(i, POPSIZE - i - 1);
+			Xover(i, numberOfPoints - i - 1);
 		}
 	}
 }
@@ -414,7 +416,7 @@ void crossover()
 /* Exchange random two genes in the population selected for mutation */
 void mutate()
 {
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		srand(time(NULL));
 		double x = rand() % 1000 / 1000.0;
@@ -424,8 +426,8 @@ void mutate()
 			index1 = index2 = 0;
 			while (index1 == index2)
 			{
-				index1 = rand() % POPSIZE;
-				index2 = rand() % POPSIZE;
+				index1 = rand() % numberOfPoints;
+				index2 = rand() % numberOfPoints;
 			}
 			int tmp = population[i].pointSequence[index1];
 			population[i].pointSequence[index1] = population[i].pointSequence[index2];
@@ -441,7 +443,7 @@ void findTheBest()
 	decideVehicleRoute();
 	evaluate();
 	chromosomeB.fitness = LLONG_MAX;
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		if (population[i].fitness < chromosomeB.fitness)
 		{
@@ -458,7 +460,7 @@ void findTheWorst()
 	evaluate();
 	int index1, index2, worst1, worst2;
 	index1 = index2 = worst1 = worst2 = 0;
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		if (population[i].fitness > worst1)
 		{
@@ -466,7 +468,7 @@ void findTheWorst()
 			index1 = i;
 		}
 	}
-	for (int i = 0; i < POPSIZE; i++)
+	for (int i = 0; i < numberOfPoints; i++)
 	{
 		if (population[i].fitness > worst2 && population[i].fitness <= worst1)
 		{
@@ -478,10 +480,70 @@ void findTheWorst()
 	population[index2] = chromosomeB;
 }
 
-int main()
+/* Set the background color of the window */
+void background(void)
 {
+	glClearColor(0.0, 0.0, 0.0, 0.0);
+}
+
+/* Reshape the window */
+void myReshape(GLsizei w, GLsizei h)
+{
+	glViewport(0, 0, w, h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+}
+
+/* Main display function. Decide things to display */
+void myDisplay(void)
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+	glLoadIdentity();
+	double r[20] = {0.6, 0.2, 0.7, 0.0, 0.0, 0.8, 0.8, 0.6, 0.2, 0.2, 0.4, 0.4, 0.4, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6, 0.8};
+	double g[20] = {0.8, 0.6, 0.0, 0.7, 0.0, 0.6, 0.6, 0.2, 0.2, 0.4, 0.2, 0.4, 0.2, 0.4, 0.4, 0.4, 0.8, 0.6, 0.9, 0.9};
+	double b[20] = {0.9, 0.4, 0.0, 0.0, 0.7, 0.9, 0.6, 0.4, 0.4, 0.2, 0.2, 0.2, 0.4, 0.4, 0.6, 0.2, 0.6, 0.8, 0.8, 0.6};
+	glPointSize(4);
+	glColor3f(1.0, 1.0, 1.0);
+	glBegin(GL_POINTS);
+		glVertex2f(0.0, 0.0);
+	glEnd();
+	glBegin(GL_POINTS);
+		for (int i = 0; i < currentBest.vehicleServices.size(); i++)
+		{
+			glColor3f(r[i % 20], g[i % 20], b[i % 20]);
+			for (int j = 0; j < currentBest.vehicleServices[i].size(); j++)
+			{
+				glVertex2f(double(cityByOrder[currentBest.vehicleServices[i][j]].x / coordinateX), double(cityByOrder[currentBest.vehicleServices[i][j]].y / coordinateY));
+			}
+		}
+	glEnd();
+	glBegin(GL_LINES);
+		for (int i = 0; i < currentBest.vehicleServices.size(); i++)
+		{
+			glColor3f(r[i % 20], g[i % 20], b[i % 20]);
+			int tmp = 0;
+			for (int j = 0; j < currentBest.vehicleServices[i].size(); j++)
+			{
+				glVertex2f(double(cityByOrder[tmp].x / coordinateX), double(cityByOrder[tmp].y / coordinateY));
+				glVertex2f(double(cityByOrder[currentBest.vehicleServices[i][j]].x / coordinateX), double(cityByOrder[currentBest.vehicleServices[i][j]].y / coordinateY));
+				tmp = currentBest.vehicleServices[i][j];
+			}
+			glVertex2f(double(cityByOrder[tmp].x / coordinateX), double(cityByOrder[tmp].y / coordinateY));
+			glVertex2f(double(cityByOrder[0].x / coordinateX), double(cityByOrder[0].y / coordinateY));
+		}
+	glEnd();
+
+	glFlush();
+}
+
+int main(int argc, char ** argv)
+{
+	string fileName;
+	printf("%s", "Please enter the name of the test file: ");
+	cin >> fileName;
 	fstream inout;
-	inout.open("tai75a.dat", ios::in);
+	inout.open(fileName, ios::in);
 	inout >> numberOfPoints >> currentKnownBest >> capacity;
 
 	node depot;
@@ -490,23 +552,44 @@ int main()
 	cities.push_back(depot);
 	cityByOrder.push_back(depot);
 
+	maxX = minX = maxY = minY = 0;
 	for (int i = 0; i < numberOfPoints; i++)
 	{
 		node city;
 		int num;
 		inout >> num >> city.x >> city.y >> city.demand;
+		if (city.x > maxX)
+			maxX = city.x;
+		if (city.x < minX)
+			minX = city.x;
+		if (city.y > maxY)
+			maxY = city.y;
+		if (city.y < minY)
+			minY = city.y;
 		city.angleValue = 0;
 		city.No = i + 1;
 		cities.push_back(city);
 		cityByOrder.push_back(city);
 	}
 	inout.close();
+	coordinateX = max(0 - minX, maxX) + 1;
+	coordinateY = max(0 - minY, maxY) + 1;
 	inout.open("res.txt", ios::out);
 
 	generation = 0;
 	initialize();
 	evaluate();
 	keepTheBest();
+
+	/*glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+	glutInitWindowSize(640, 640);
+	glutInitWindowPosition(200, 200);
+	glutCreateWindow("testShowPoint");
+	background();
+	glutReshapeFunc(myReshape);
+	glutDisplayFunc(myDisplay);*/
+
 	while (!stopRule())
 	{
 		generation++;
@@ -521,6 +604,9 @@ int main()
 		decideVehicleRoute();
 		evaluate();
 		keepTheBest();
+
+		//glutMainLoopEvent();
+		//glutPostRedisplay();
 
 		inout << generation << "\t" << currentBest.fitness << endl;
 	}
